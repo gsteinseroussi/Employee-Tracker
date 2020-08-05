@@ -2,6 +2,7 @@ const mysql = require("mysql");
 const inquirer = require("inquirer");
 const cTable = require("console.table");
 const { start } = require("repl");
+const { connect } = require("http2");
 const connection = mysql.createConnection({
   host: "localhost",
   port: 3306,
@@ -34,7 +35,7 @@ function startQuestions() {
       },
     ])
     .then(function (answers) {
-      switch (answers.action) {
+      switch (answers.initialQ) {
         case "Add a department":
           addDepartment();
           break;
@@ -69,38 +70,120 @@ function addDepartment() {
       message: "What department would you like to add?",
     })
     .then(function (answer) {
-      const query = "INSERT INTO department SET ?";
-      connection.query(query, { name: answer.name }, function (err) {
-        if (err) throw err;
+      const query = connection.query(
+        "INSERT INTO department SET ?",
+        {
+          name: answer.departmentName,
+        },
+        function (err, res) {
+          if (err) throw err;
 
-        console.log("You have successfully added a department.");
-      });
+          console.log("You have successfully added a department");
+        }
+      );
     });
 }
 
 function addRole() {
-  inquirer
-    .prompt([
-      {
-        type: "input",
-        name: "roleName",
-        message: "What role would you like to add?",
-      },
-      {
-        type: "input",
-        name: "roleSalary",
-        message: "What is this position's starting salary?",
-      },
-      {
-        type: "rawlist",
-        name: "departmentOfRole",
-        message: "Which department does this role belong in?",
-        choices: [
-          connection.query("SELECT * FROM department", function (err) {
+  let department;
+  connection.query("SELECT * FROM department", (err, res) => {
+    if (err) throw err;
+    department = res;
+
+    inquirer
+      .prompt([
+        {
+          type: "input",
+          name: "roleName",
+          message: "What role would you like to add?",
+        },
+        {
+          type: "input",
+          name: "roleSalary",
+          message: "What is this position's starting salary?",
+        },
+        {
+          type: "rawlist",
+          name: "departmentOfRole",
+          message: "Which department does this role belong in?",
+          choices: department,
+        },
+      ])
+      .then(function (answers) {
+        let departmentId;
+        connection.query(
+          "SELECT * FROM department WHERE name = ?",
+          [answers.departmentOfRole],
+          function (err, result) {
             if (err) throw err;
-          }),
-        ],
-      },
-    ])
-    .then(function (answers) {});
+            departmentId = parseInt(result.id);
+            console.log(departmentId);
+          }
+        );
+
+        connection.query(
+          "INSERT INTO role SET ?",
+          {
+            name: answers.roleName,
+            salary: answers.roleSalary,
+            department_id: departmentId,
+          },
+          function (err, res) {
+            if (err) throw err;
+
+            console.log("You have successfully added a role");
+          }
+        );
+      });
+  });
+}
+
+function addEmployee() {
+  let role;
+  connection.query("SELECT * FROM role", (err, res) => {
+    if (err) throw err;
+
+    role = res.name;
+
+    inquirer
+      .prompt([
+        {
+          type: "input",
+          name: "employeeFirstName",
+          message: "What is your employee's first name??",
+        },
+        {
+          type: "input",
+          name: "employeeLastName",
+          message: "What is your employee's last name?",
+        },
+        {
+          type: "rawlist",
+          name: "job",
+          message: "What is their position?",
+          choices: role,
+        },
+        {
+          type: "confirm",
+          name: "manager",
+          message: "Are they a manager?",
+        },
+      ])
+      .then(function (answers) {
+        const query = connection.query(
+          "INSERT INTO employee SET ?",
+          {
+            first_name: answers.employeeFirstName,
+            last_name: answers.employeeLastName,
+            role_id: answers.job.id,
+            manager_id: answers.choices,
+          },
+          function (err, res) {
+            if (err) throw err;
+
+            console.log("You have successfully added an employee");
+          }
+        );
+      });
+  });
 }
