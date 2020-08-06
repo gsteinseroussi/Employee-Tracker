@@ -7,7 +7,7 @@ const connection = mysql.createConnection({
   host: "localhost",
   port: 3306,
   user: "root",
-  password: "",
+  password: "amADeus#10",
   database: "employees",
 });
 
@@ -79,6 +79,7 @@ function addDepartment() {
           if (err) throw err;
 
           console.log("You have successfully added a department");
+          startQuestions();
         }
       );
     });
@@ -110,28 +111,32 @@ function addRole() {
         },
       ])
       .then(function (answers) {
-        let departmentId;
         connection.query(
-          "SELECT * FROM department WHERE name = ?",
+          "SELECT * FROM department WHERE department.name = ?",
           [answers.departmentOfRole],
           function (err, result) {
             if (err) throw err;
-            departmentId = parseInt(result.id);
-            console.log(departmentId);
-          }
-        );
 
-        connection.query(
-          "INSERT INTO role SET ?",
-          {
-            name: answers.roleName,
-            salary: answers.roleSalary,
-            department_id: departmentId,
-          },
-          function (err, res) {
-            if (err) throw err;
+            const string = JSON.stringify(result);
 
-            console.log("You have successfully added a role");
+            const json = JSON.parse(string);
+
+            const departmentId = parseInt(json[0].id);
+
+            connection.query(
+              "INSERT INTO role SET ?",
+              {
+                title: answers.roleName,
+                salary: answers.roleSalary,
+                department_id: departmentId,
+              },
+              function (err, res) {
+                if (err) throw err;
+
+                console.log("You have successfully added a role");
+                startQuestions();
+              }
+            );
           }
         );
       });
@@ -139,18 +144,19 @@ function addRole() {
 }
 
 function addEmployee() {
-  let role;
   connection.query("SELECT * FROM role", (err, res) => {
     if (err) throw err;
-
-    role = res.name;
+    const role = [];
+    const string = JSON.stringify(res);
+    const json = JSON.parse(string);
+    json.forEach((index) => role.push(index.title));
 
     inquirer
       .prompt([
         {
           type: "input",
           name: "employeeFirstName",
-          message: "What is your employee's first name??",
+          message: "What is your employee's first name?",
         },
         {
           type: "input",
@@ -170,20 +176,123 @@ function addEmployee() {
         },
       ])
       .then(function (answers) {
-        const query = connection.query(
-          "INSERT INTO employee SET ?",
-          {
-            first_name: answers.employeeFirstName,
-            last_name: answers.employeeLastName,
-            role_id: answers.job.id,
-            manager_id: answers.choices,
-          },
-          function (err, res) {
+        connection.query(
+          "SELECT * FROM role WHERE role.title = ?",
+          [answers.job],
+          function (err, result) {
             if (err) throw err;
 
-            console.log("You have successfully added an employee");
+            const string = JSON.stringify(result);
+
+            const json = JSON.parse(string);
+
+            const roleId = parseInt(json[0].id);
+
+            let manId;
+            if (answers.manager === false) {
+              connection.query(
+                `SELECT * FROM employee WHERE employee.role_id = ${roleId} AND employee.manager_id IS NULL`,
+                function (err, results) {
+                  if (err) throw err;
+                  console.log(results);
+                  const string = JSON.stringify(results);
+                  const json = JSON.parse(string);
+                  manId = parseInt(json[0].id);
+                  console.log(manId);
+
+                  connection.query(
+                    "INSERT INTO employee SET ?",
+                    {
+                      first_name: answers.employeeFirstName,
+                      last_name: answers.employeeLastName,
+                      role_id: roleId,
+                      manager_id: manId,
+                    },
+                    function (err, res) {
+                      if (err) throw err;
+
+                      console.log("You have successfully added an employee");
+                      startQuestions();
+                    }
+                  );
+                }
+              );
+            } else {
+              manId = null;
+            }
           }
         );
       });
   });
 }
+
+function viewByDepartment() {
+  let department;
+  connection.query("SELECT * FROM department", (err, res) => {
+    if (err) throw err;
+    department = res;
+
+    inquirer
+      .prompt([
+        {
+          type: "rawlist",
+          name: "department",
+          message: "Which department would you like to view?",
+          choices: department,
+        },
+      ])
+      .then(function (answer) {
+        let chosenDepartment = answer.department;
+        console.log(`${chosenDepartment} Employees:`);
+        connection.query(
+          "SELECT * FROM department WHERE department.name = ?",
+          [answer.department],
+          // role.department_id = department.${answer.department}.id,
+          (err, res) => {
+            if (err) throw err;
+            const string = JSON.stringify(res);
+            const json = JSON.parse(string);
+            const departmentId = json[0].id;
+
+            connection.query(
+              "SELECT * FROM role WHERE role.department_id = ?",
+              [departmentId],
+              (err, res) => {
+                if (err) throw err;
+
+                const string = JSON.stringify(res);
+                const json = JSON.parse(string);
+                const roleId = [];
+                json.forEach((obj) => {
+                  roleId.push(obj.id);
+                });
+
+                roleId.forEach((id) => {
+                  connection.query(
+                    "SELECT * FROM employee WHERE employee.role_id = ?",
+                    [id],
+                    (err, res) => {
+                      if (err) throw err;
+
+                      const string = JSON.stringify(res);
+                      const json = JSON.parse(string);
+
+                      json.forEach((emp) => {
+                        console.log(emp.first_name, emp.last_name);
+                      });
+                    }
+                  );
+                });
+              }
+            );
+          }
+        );
+      });
+  });
+}
+
+function viewByRole() {}
+
+function viewAll() {}
+
+function updateRoles() {}
