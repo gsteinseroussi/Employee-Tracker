@@ -1,13 +1,12 @@
 const mysql = require("mysql");
 const inquirer = require("inquirer");
 const cTable = require("console.table");
-const { start } = require("repl");
-const { connect } = require("http2");
+require("dotenv").config();
 const connection = mysql.createConnection({
-  host: "localhost",
+  host: process.env.DB_HOST,
   port: 3306,
-  user: "root",
-  password: "amADeus#10",
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
   database: "employees",
 });
 
@@ -27,8 +26,8 @@ function startQuestions() {
           "Add a department",
           "Add a role",
           "Add an employee",
-          "View employee by department",
-          "View employee by role",
+          "View departments",
+          "View roles",
           "View all employees",
           "Update employee roles",
         ],
@@ -45,11 +44,11 @@ function startQuestions() {
         case "Add an employee":
           addEmployee();
           break;
-        case "View employee by department":
+        case "View departments":
           viewByDepartment();
           break;
-        case "View employee by role":
-          viewByRole();
+        case "View roles":
+          viewRoles();
           break;
         case "View all employees":
           viewAll();
@@ -176,12 +175,13 @@ function addEmployee() {
         },
       ])
       .then(function (answers) {
+        const stringJob = JSON.stringify(answers.job);
         connection.query(
           "SELECT * FROM role WHERE role.title = ?",
-          [answers.job],
+          [stringJob],
           function (err, result) {
             if (err) throw err;
-
+            console.log(res);
             const string = JSON.stringify(result);
 
             const json = JSON.parse(string);
@@ -191,10 +191,11 @@ function addEmployee() {
             let manId;
             if (answers.manager === false) {
               connection.query(
-                `SELECT * FROM employee WHERE employee.role_id = ${roleId} AND employee.manager_id IS NULL`,
+                "SELECT * FROM employee WHERE employee.role_id = ? AND employee.manager_id = ?",
+                [roleId, 0],
                 function (err, results) {
                   if (err) throw err;
-                  console.log(results);
+                  console.log(JSON.stringify(results));
                   const string = JSON.stringify(results);
                   const json = JSON.parse(string);
                   manId = parseInt(json[0].id);
@@ -212,7 +213,6 @@ function addEmployee() {
                       if (err) throw err;
 
                       console.log("You have successfully added an employee");
-                      startQuestions();
                     }
                   );
                 }
@@ -291,8 +291,96 @@ function viewByDepartment() {
   });
 }
 
-function viewByRole() {}
+function viewRoles() {
+  connection.query("SELECT * FROM role", (err, res) => {
+    if (err) throw err;
+    const roleString = JSON.stringify(res);
+    const roleJSON = JSON.parse(roleString);
+    const table = cTable.getTable(roleJSON);
+    console.log(table);
+  });
+}
 
-function viewAll() {}
+function viewAll() {
+  connection.query("SELECT * FROM employee", (err, res) => {
+    if (err) throw err;
+    const emplString = JSON.stringify(res);
+    const emplJSON = JSON.parse(emplString);
+    const table = cTable.getTable(emplJSON);
+    console.log(table);
+  });
+}
 
-function updateRoles() {}
+function updateRoles() {
+  let employees = [];
+  let roles = [];
+
+  connection.query("SELECT * FROM role", (err, res) => {
+    if (err) throw err;
+    res.forEach((role) => roles.push(role.title));
+
+    connection.query("SELECT * FROM employee", (err, res) => {
+      if (err) throw err;
+
+      res.forEach((employee) => employees.push(employee.last_name));
+
+      inquirer
+        .prompt([
+          {
+            type: "rawlist",
+            name: "updateEmpl",
+            message: "Which employee would you like to update?",
+            choices: employees,
+          },
+        ])
+        .then((answer) => {
+          const stringUpdateEmpl = JSON.stringify(answer.updateEmpl);
+          const jsonEmpl = JSON.parse(stringUpdateEmpl);
+          connection.query(
+            "SELECT * FROM employee WHERE employee.last_name = ?",
+            [jsonEmpl],
+            (err, res) => {
+              if (err) throw err;
+              const selectedEmployee = JSON.stringify(res);
+              const parseSelectedEmpl = JSON.parse(selectedEmployee);
+              console.log(parseSelectedEmpl);
+
+              inquirer
+                .prompt([
+                  {
+                    type: "rawlist",
+                    name: "updateRole",
+                    message: `What role has ${parseSelectedEmpl[0].first_name} ${parseSelectedEmpl[0].last_name} changed to?`,
+                    choices: roles,
+                  },
+                ])
+                .then((answer) => {
+                  const stringUpdateRole = JSON.stringify(answer.updateRole);
+                  const parsedUpdateRole = JSON.parse(stringUpdateRole);
+                  connection.query(
+                    "SELECT * FROM role WHERE role.title =?",
+                    [parsedUpdateRole],
+                    (err, res) => {
+                      if (err) throw err;
+
+                      connection.query(
+                        "UPDATE employee SET employee.role_id = ? WHERE employee.id = ?",
+                        [
+                          parseInt(res[0].id),
+                          parseInt(parseSelectedEmpl[0].id),
+                        ],
+                        (err, result) => {
+                          if (err) throw err;
+
+                          console.log("Success");
+                        }
+                      );
+                    }
+                  );
+                });
+            }
+          );
+        });
+    });
+  });
+}
