@@ -1,6 +1,7 @@
 const mysql = require("mysql");
 const inquirer = require("inquirer");
 const cTable = require("console.table");
+const { restoreDefaultPrompts } = require("inquirer");
 require("dotenv").config();
 const connection = mysql.createConnection({
   host: process.env.DB_HOST,
@@ -30,6 +31,7 @@ function startQuestions() {
           "View roles",
           "View all employees",
           "Update employee roles",
+          "End app",
         ],
       },
     ])
@@ -55,6 +57,10 @@ function startQuestions() {
           break;
         case "Update employee roles":
           updateRoles();
+          break;
+        case "End app":
+          console.log("Goodbye");
+          connection.end();
           break;
       }
     });
@@ -219,17 +225,29 @@ function addEmployee() {
                 }
               );
             } else {
-              manId = null;
+              connection.query(
+                "INSERT INTO employee SET ?",
+                {
+                  first_name: answers.employeeFirstName,
+                  last_name: answers.employeeLastName,
+                  role_id: roleId,
+                  manager_id: null,
+                },
+                (err, res) => {
+                  if (err) throw err;
 
-              startQuestions();
+                  console.log("You have successfully added an employee");
+
+                  startQuestions();
+                }
+              );
             }
           }
         );
       });
   });
 }
-
-function viewByDepartment() {
+async function viewByDepartment() {
   let department;
   connection.query("SELECT * FROM department", (err, res) => {
     if (err) throw err;
@@ -246,11 +264,10 @@ function viewByDepartment() {
       ])
       .then(function (answer) {
         let chosenDepartment = answer.department;
-        console.log(`${chosenDepartment} Employees:`);
+
         connection.query(
           "SELECT * FROM department WHERE department.name = ?",
           [answer.department],
-          // role.department_id = department.${answer.department}.id,
           (err, res) => {
             if (err) throw err;
             const string = JSON.stringify(res);
@@ -263,6 +280,7 @@ function viewByDepartment() {
               (err, res) => {
                 if (err) throw err;
 
+                console.log(`${chosenDepartment} Employees:`);
                 const string = JSON.stringify(res);
                 const json = JSON.parse(string);
                 const roleId = [];
@@ -274,7 +292,7 @@ function viewByDepartment() {
                   connection.query(
                     "SELECT * FROM employee WHERE employee.role_id = ?",
                     [id],
-                    (err, res) => {
+                    function (err, res) {
                       if (err) throw err;
 
                       const string = JSON.stringify(res);
@@ -283,8 +301,6 @@ function viewByDepartment() {
                       json.forEach((emp) => {
                         console.log(emp.first_name, emp.last_name);
                       });
-
-                      startQuestions();
                     }
                   );
                 });
