@@ -175,13 +175,11 @@ function addEmployee() {
         },
       ])
       .then(function (answers) {
-        const stringJob = JSON.stringify(answers.job);
         connection.query(
           "SELECT * FROM role WHERE role.title = ?",
-          [stringJob],
+          [answers.job],
           function (err, result) {
             if (err) throw err;
-            console.log(res);
             const string = JSON.stringify(result);
 
             const json = JSON.parse(string);
@@ -191,34 +189,39 @@ function addEmployee() {
             let manId;
             if (answers.manager === false) {
               connection.query(
-                "SELECT * FROM employee WHERE employee.role_id = ? AND employee.manager_id = ?",
-                [roleId, 0],
+                "SELECT * FROM employee WHERE employee.role_id = ? AND employee.manager_id IS NULL",
+                [roleId],
                 function (err, results) {
                   if (err) throw err;
-                  console.log(JSON.stringify(results));
-                  const string = JSON.stringify(results);
-                  const json = JSON.parse(string);
-                  manId = parseInt(json[0].id);
-                  console.log(manId);
 
-                  connection.query(
-                    "INSERT INTO employee SET ?",
-                    {
-                      first_name: answers.employeeFirstName,
-                      last_name: answers.employeeLastName,
-                      role_id: roleId,
-                      manager_id: manId,
-                    },
-                    function (err, res) {
-                      if (err) throw err;
+                  if (results.length > 0) {
+                    console.log(results);
+                    manId = parseInt(results[0].id);
+                    console.log(manId);
 
-                      console.log("You have successfully added an employee");
-                    }
-                  );
+                    connection.query(
+                      "INSERT INTO employee SET ?",
+                      {
+                        first_name: answers.employeeFirstName,
+                        last_name: answers.employeeLastName,
+                        role_id: roleId,
+                        manager_id: manId,
+                      },
+                      function (err, res) {
+                        if (err) throw err;
+
+                        console.log("You have successfully added an employee");
+
+                        startQuestions();
+                      }
+                    );
+                  }
                 }
               );
             } else {
               manId = null;
+
+              startQuestions();
             }
           }
         );
@@ -280,6 +283,8 @@ function viewByDepartment() {
                       json.forEach((emp) => {
                         console.log(emp.first_name, emp.last_name);
                       });
+
+                      startQuestions();
                     }
                   );
                 });
@@ -298,6 +303,8 @@ function viewRoles() {
     const roleJSON = JSON.parse(roleString);
     const table = cTable.getTable(roleJSON);
     console.log(table);
+
+    startQuestions();
   });
 }
 
@@ -308,6 +315,8 @@ function viewAll() {
     const emplJSON = JSON.parse(emplString);
     const table = cTable.getTable(emplJSON);
     console.log(table);
+
+    startQuestions();
   });
 }
 
@@ -373,6 +382,7 @@ function updateRoles() {
                           if (err) throw err;
 
                           console.log("Success");
+                          startQuestions();
                         }
                       );
                     }
