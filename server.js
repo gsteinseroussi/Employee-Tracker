@@ -247,7 +247,7 @@ function addEmployee() {
       });
   });
 }
-async function viewByDepartment() {
+function viewByDepartment() {
   let department;
   connection.query("SELECT * FROM department", (err, res) => {
     if (err) throw err;
@@ -270,40 +270,19 @@ async function viewByDepartment() {
           [answer.department],
           (err, res) => {
             if (err) throw err;
-            const string = JSON.stringify(res);
-            const json = JSON.parse(string);
-            const departmentId = json[0].id;
+            const departmentId = res[0].id;
 
             connection.query(
-              "SELECT * FROM role WHERE role.department_id = ?",
+              `SELECT e.first_name, e.last_name FROM employee e INNER JOIN role r on r.id = e.role_id WHERE r.department_id = ?`,
               [departmentId],
               (err, res) => {
                 if (err) throw err;
-
-                console.log(`${chosenDepartment} Employees:`);
-                const string = JSON.stringify(res);
-                const json = JSON.parse(string);
-                const roleId = [];
-                json.forEach((obj) => {
-                  roleId.push(obj.id);
+                console.log(`\n${chosenDepartment} Employees:`);
+                res.forEach((emp) => {
+                  console.log(` - ${emp.first_name} ${emp.last_name}`);
                 });
-
-                roleId.forEach((id) => {
-                  connection.query(
-                    "SELECT * FROM employee WHERE employee.role_id = ?",
-                    [id],
-                    function (err, res) {
-                      if (err) throw err;
-
-                      const string = JSON.stringify(res);
-                      const json = JSON.parse(string);
-
-                      json.forEach((emp) => {
-                        console.log(emp.first_name, emp.last_name);
-                      });
-                    }
-                  );
-                });
+                console.log(" ");
+                startQuestions();
               }
             );
           }
