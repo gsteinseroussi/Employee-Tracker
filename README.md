@@ -22,7 +22,8 @@ It requires npm installation of mysql, inquirer, and console.table
 
 ## Usage:
 
-The app is fully ran in the cli
+The app is fully ran in the cli.
+https://drive.google.com/file/d/1YH0hTms8sVqnO0w4X3bcKCV9hhlwicmH/view
 
 ## License:
 
